@@ -1,4 +1,4 @@
-use bevy::prelude::*;
+use bevy::{input::{keyboard::KeyboardInput, ButtonState}, prelude::*};
 
 pub struct DevCommandPalettePlugin;
 
@@ -7,6 +7,7 @@ impl Plugin for DevCommandPalettePlugin {
         app.add_event::<RebuildCommandPalette>()
             .add_systems(Update, open_command_palette)
             .add_systems(Update, rebuild_command_palette)
+            .add_systems(Update, update_text)
             .init_resource::<DevCommandPalette>();
     }
 }
@@ -22,6 +23,9 @@ struct RebuildCommandPalette;
 
 #[derive(Component)]
 struct CommandPaletteRoot;
+
+#[derive(Component)]
+struct TextInput;
 
 fn open_command_palette(
     mut r_dev_command_palette: ResMut<DevCommandPalette>,
@@ -69,18 +73,83 @@ fn rebuild_command_palette(
                 //flex direction: row
                 commands.spawn(NodeBundle {
                     style: Style {
-                        position_type: PositionType::Absolute,
-                        flex_direction: FlexDirection::Column,
+                        position_type: PositionType::Relative,
+                        flex_direction: FlexDirection::Row,
                         display: Display::Flex,
-                        left: Val::Percent(0.2),
-                        right: Val::Percent(0.2),
-                        top: Val::Percent(0.2),
+                        left: Val::Percent(10.0),
+                        top: Val::Percent(10.0),
+                        width: Val::Percent(80.0),
                         min_height: Val::Px(100.0),
+                        padding: UiRect::all(Val::Px(10.0)),
+                        
                         ..default()
                     },
                     background_color: Color::rgba(0.0, 0.0, 0.0, 0.5).into(),
                     ..default()
+                }).with_children(|commands| {
+                    commands
+                        .spawn(NodeBundle {
+                            style: Style {
+                                position_type: PositionType::Relative,
+                                margin: UiRect::all(Val::Px(10.0)),
+                                border: UiRect::all(Val::Px(1.0)),
+                                width: Val::Percent(100.0),
+                                height: Val::Px(30.0),
+                                ..default()
+                            },
+                            border_color: Color::rgb(0.8, 0.8, 0.8).into(),
+                            ..default()
+                        }).with_children(|commands| {
+                            commands
+                                .spawn(TextBundle {
+                                    style: Style {
+                                        position_type: PositionType::Relative,
+                                        ..default()
+                                    },
+                                    text: Text::from_section(r_dev_command_palette.input.clone(), TextStyle::default()),
+                                    ..default()
+                                });
+                        });  
                 });
             });
+    }
+}
+
+fn update_text(
+    mut r_dev_command_palette: ResMut<DevCommandPalette>,
+    mut ev_rebuild_command_palette: EventWriter<RebuildCommandPalette>,
+    mut ev_keydown: EventReader<KeyboardInput>,
+) {
+    if ev_keydown.is_empty() {
+        return;
+    }
+
+    for ev in ev_keydown.read() {
+        let KeyboardInput {
+            key_code,
+            logical_key,
+            state,
+            window,
+        } = ev;
+
+        if *state == ButtonState::Pressed {
+            match logical_key {
+                bevy::input::keyboard::Key::Character(val) => {
+                    r_dev_command_palette.input.push(val.chars().next().unwrap());
+                    ev_rebuild_command_palette.send(RebuildCommandPalette);
+                },
+                bevy::input::keyboard::Key::Backspace => {
+                    r_dev_command_palette.input.pop();
+                    ev_rebuild_command_palette.send(RebuildCommandPalette);
+                },
+
+                bevy::input::keyboard::Key::Enter => {
+                    //TODO
+                }
+                _ => {
+                
+                }
+            }
+        }
     }
 }
